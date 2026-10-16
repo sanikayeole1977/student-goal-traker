@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyPulse - Student Daily Goal Tracker & Study Planner</title>
+  <meta name="description" content="A multi-page student goal tracker and wellness platform. Categorized daily goals, Me Time relaxation sanctuary, box breathing, 30-day heatmap analytics, exam countdowns, and Supabase cloud persistence.">
+  <meta name="keywords" content="student goal tracker, daily planner, me time student wellness, box breathing, study tracker, pomodoro timer, supabase database">
+  <meta name="author" content="StudyPulse">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Supabase JS Client (v2) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Optional static config -->
+  <script src="config.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+  <!-- Canvas for celebration confetti -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <div class="app-layout">
+    <!-- Top Main Header Bar -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-title">StudyPulse</h1>
+          <span class="brand-subtitle">Student Goal &amp; Wellness Platform</span>
+        </div>
+      </div>
+
+      <!-- Action & Profile Controls -->
+      <div class="header-actions">
+        <!-- Database Backend Status Pill -->
+        <button id="btn-db-status" class="db-status-pill status-local" title="Click to configure Supabase Cloud Database" aria-label="Database Status">
+          <span class="status-indicator-dot"></span>
+          <span id="db-status-label" class="db-status-label">Local DB Mode</span>
+        </button>
+
+        <!-- Auth Account / Profile Button -->
+        <button id="btn-auth-trigger" class="btn-action-icon auth-trigger-btn" title="User Authentication" aria-label="User Account">
+          <div id="auth-avatar" class="auth-avatar-circle">👤</div>
+          <span id="auth-label" class="auth-btn-label">Sign In</span>
+        </button>
+
+        <!-- Streak Counter -->
+        <div class="streak-badge" id="streak-indicator" title="Consecutive days with completed goals!">
+          <span class="fire-icon">🔥</span>
+          <span class="streak-count" id="streak-val">0</span>
+          <span class="streak-label">Streak</span>
+        </div>
+
+        <!-- Pomodoro Quick Trigger -->
+        <button id="btn-open-pomodoro" class="btn-action-icon" title="Focus Timer (Pomodoro)" aria-label="Open Pomodoro Timer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span class="btn-tag">Focus</span>
+        </button>
+
+        <!-- Sound Toggle -->
+        <button id="btn-sound-toggle" class="btn-action-icon" title="Toggle Sound Chimes" aria-label="Toggle Sound">
+          <span id="sound-icon">🔊</span>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="btn-theme-toggle" class="btn-action-icon" title="Toggle Light / Dark Mode" aria-label="Toggle Color Theme">
+          <span id="theme-icon">🌙</span>
+        </button>
+
+        <!-- Add Goal Primary CTA -->
+        <button id="btn-open-add-modal" class="btn-primary" aria-label="Add new goal">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>New Goal</span>
+          <kbd class="shortcut-kbd">N</kbd>
+        </button>
+      </div>
+    </header>
+
+    <!-- Multi-Page App Navigation Bar -->
+    <nav class="app-page-nav" role="tablist" aria-label="Application Pages">
+      <button class="page-nav-item active" data-page="goals" role="tab" aria-selected="true">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-text">Daily Goals</span>
+      </button>
+
+      <!-- Special "Me Time" Page Tab -->
+      <button class="page-nav-item page-nav-special" data-page="metime" role="tab" aria-selected="false">
+        <span class="nav-icon">🌿</span>
+        <span class="nav-text">Me Time</span>
+        <span class="special-badge">Special Menu ✨</span>
+      </button>
+
+      <button class="page-nav-item" data-page="analytics" role="tab" aria-selected="false">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">Analytics &amp; Heatmap</span>
+      </button>
+
+      <button class="page-nav-item" data-page="schedule" role="tab" aria-selected="false">
+        <span class="nav-icon">📅</span>
+        <span class="nav-text">Exams &amp; Deadlines</span>
+      </button>
+
+      <button class="page-nav-item" data-page="settings" role="tab" aria-selected="false">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-text">Settings &amp; Cloud</span>
+      </button>
+    </nav>
+
+    <!-- Supabase Setup Notice Banner (Visible if credentials are not configured) -->
+    <div id="supabase-banner-notice" class="supabase-banner">
+      <div class="banner-left">
+        <span class="banner-icon">⚡</span>
+        <div class="banner-text">
+          <strong>Supabase Cloud Database Setup:</strong>
+          <span>Connect your Supabase project to enable cloud persistence, multi-device sync, and secure student user authentication.</span>
+        </div>
+      </div>
+      <div class="banner-actions">
+        <button id="btn-banner-setup" class="btn-banner-primary">Configure Supabase</button>
+        <button id="btn-banner-dismiss" class="btn-banner-dismiss" title="Dismiss banner">✕</button>
+      </div>
+    </div>
+
+    <!-- Main Content Container with Multiple Page Views -->
+    <main class="app-main">
+
+      <!-- ================= PAGE 1: DAILY GOALS ================= -->
+      <section id="page-goals" class="page-view active" aria-label="Daily Goals Page">
+        
+        <!-- Date Navigator Bar -->
+        <div class="goals-date-bar">
+          <nav class="date-navigator" aria-label="Date Selection">
+            <button id="btn-prev-day" class="nav-btn icon-btn" title="Previous Day" aria-label="Previous Day">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+
+            <div class="current-date-pill" id="date-display-wrapper" tabindex="0" role="button" aria-label="Choose specific date">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span id="current-date-text">Loading date...</span>
+              <span id="day-badge" class="badge-today">Today</span>
+              <input type="date" id="date-picker-hidden" class="sr-only" aria-label="Select date input">
+            </div>
+
+            <button id="btn-next-day" class="nav-btn icon-btn" title="Next Day" aria-label="Next Day">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+            <button id="btn-today-jump" class="btn-ghost-sm" title="Jump to Today">Today</button>
+          </nav>
+
+          <div class="date-bar-right">
+            <span class="active-date-summary" id="date-summary-text">Categorized student milestones</span>
+          </div>
+        </div>
+
+        <!-- Hero Metrics -->
+        <section class="dashboard-hero" aria-label="Daily Overview &amp; Progress">
+          <!-- Progress Ring Card -->
+          <div class="card glass-card hero-progress-card">
+            <div class="card-header-compact">
+              <h2 class="section-title-sm">Daily Target Completion</h2>
+              <span class="card-chip" id="daily-status-chip">No Goals</span>
+            </div>
+            
+            <div class="progress-ring-container">
+              <div class="circular-chart-wrapper">
+                <svg viewBox="0 0 100 100" class="circular-chart">
+                  <defs>
+                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#8B5CF6"/>
+                      <stop offset="100%" stop-color="#06B6D4"/>
+                    </linearGradient>
+                  </defs>
+                  <circle class="circle-bg" cx="50" cy="50" r="42"/>
+                  <circle id="progress-circle" class="circle-fill" cx="50" cy="50" r="42" stroke-dasharray="263.89" stroke-dashoffset="263.89"/>
+                </svg>
+                <div class="circle-inner-content">
+                  <span id="progress-percentage" class="percentage-number">0%</span>
+                  <span id="progress-ratio" class="ratio-text">0 of 0 goals</span>
+                </div>
+              </div>
+              
+              <div class="progress-stats-column">
+                <div class="stat-metric">
+                  <span class="stat-metric-label">Completed</span>
+                  <span id="stat-completed-num" class="stat-metric-val color-success">0</span>
+                </div>
+                <div class="stat-metric">
+                  <span class="stat-metric-label">Pending</span>
+                  <span id="stat-pending-num" class="stat-metric-val color-warning">0</span>
+                </div>
+                <div class="stat-metric">
+                  <span class="stat-metric-label">Study Time</span>
+                  <span id="stat-focus-time" class="stat-metric-val color-accent">0m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Categorized Progress Overview Card -->
+          <div class="card glass-card hero-categories-card">
+            <div class="card-header-compact">
+              <h2 class="section-title-sm">Category Performance</h2>
+              <button id="btn-manage-categories" class="btn-text-sm" aria-label="Manage categories">+ Custom</button>
+            </div>
+            <div class="category-bars-list" id="category-progress-bars">
+              <!-- Dynamically populated category progress bars -->
+            </div>
+          </div>
+
+          <!-- Motivation & Daily Reflection Card -->
+          <div class="card glass-card hero-quote-card">
+            <div class="quote-header">
+              <span class="quote-badge">💡 Today's Focus</span>
+              <button id="btn-refresh-quote" class="icon-btn-tiny" title="Get new inspiration" aria-label="Refresh Quote">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+              </button>
+            </div>
+            <p id="quote-text" class="quote-content">"Success is the sum of small efforts, repeated day in and day out."</p>
+            <span id="quote-author" class="quote-author">— Robert Collier</span>
+            
+            <div class="quick-reflection-bar">
+              <label for="daily-quick-note" class="sr-only">Daily Reflection Note</label>
+              <input type="text" id="daily-quick-note" placeholder="Write today's key learning or reflection..." aria-label="Today's learning reflection">
+              <button id="btn-save-note" class="btn-save-note" title="Save reflection">Save</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Interactive Controls Toolbar -->
+        <section class="controls-toolbar" aria-label="Goal Filters and View Options">
+          <!-- Search bar -->
+          <div class="search-input-box">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-goals-input" placeholder="Search goals by title, subject or tag..." aria-label="Search goals">
+            <button id="btn-clear-search" class="clear-search-btn sr-only" title="Clear search" aria-label="Clear Search">✕</button>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="category-pills-container" id="category-filter-pills" role="tablist" aria-label="Filter goals by category">
+            <button class="filter-pill active" data-category="all" role="tab" aria-selected="true">
+              <span class="pill-icon">✨</span>
+              <span class="pill-label">All Categories</span>
+              <span class="pill-count" id="count-all">0</span>
+            </button>
+          </div>
+
+          <!-- Status & View Options -->
+          <div class="filter-actions-right">
+            <div class="custom-select-wrapper">
+              <select id="status-filter-select" aria-label="Filter by goal status">
+                <option value="all">All Status</option>
+                <option value="pending">Active / Pending</option>
+                <option value="completed">Completed</option>
+                <option value="high-priority">Priority: High 🔥</option>
+              </select>
+            </div>
+
+            <div class="view-mode-toggle" role="group" aria-label="View layout switch">
+              <button id="btn-view-list" class="view-btn active" title="Categorized List View" aria-label="List View">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+              </button>
+              <button id="btn-view-board" class="view-btn" title="Category Columns View" aria-label="Board View">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="18" rx="1"></rect>
+                  <rect x="14" y="3" width="7" height="18" rx="1"></rect>
+                </svg>
+              </button>
+            </div>
+
+            <!-- More Options Dropdown -->
+            <div class="dropdown-wrapper">
+              <button id="btn-more-options" class="btn-action-icon" title="More Options" aria-label="More Settings">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="1"></circle>
+                  <circle cx="19" cy="12" r="1"></circle>
+                  <circle cx="5" cy="12" r="1"></circle>
+                </svg>
+              </button>
+              <div id="more-options-menu" class="dropdown-menu hidden">
+                <button id="btn-menu-db-config" class="dropdown-item">⚙️ Database Setup (Supabase)</button>
+                <button id="btn-menu-load-sample" class="dropdown-item">💡 Load Student Sample Goals</button>
+                <button id="btn-menu-export-data" class="dropdown-item">📥 Export Data (JSON)</button>
+                <button id="btn-menu-import-data" class="dropdown-item">📤 Import Data</button>
+                <input type="file" id="import-file-input" class="sr-only" accept=".json">
+                <button id="btn-menu-clear-all" class="dropdown-item text-danger">🗑️ Clear Current Day Goals</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Main Goals Content Area -->
+        <section class="goals-display-container" id="goals-main-container">
+          <div id="goals-list-view" class="goals-list-view"></div>
+          <div id="goals-board-view" class="goals-board-view hidden"></div>
+          <div id="empty-state-view" class="empty-state-card hidden">
+            <div class="empty-icon-wrap">🎯</div>
+            <h3 class="empty-title">No Goals Recorded for this Date</h3>
+            <p class="empty-desc">Your daily consistency starts with clear, structured intentions. Add your first goal or load realistic study samples to begin!</p>
+            <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
+              <button id="btn-empty-add-goal" class="btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Create Goal
+              </button>
+              <button id="btn-empty-load-sample" class="btn-secondary">Load Sample Goals</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- ================= PAGE 2: "ME TIME" SPECIAL OASIS & MENU ================= -->
+      <section id="page-metime" class="page-view hidden" aria-label="Me Time Special Wellness Menu">
+        
+        <!-- Me Time Hero Sanctuary Banner -->
+        <div class="metime-hero-banner">
+          <div class="metime-hero-content">
+            <span class="metime-pill-tag">🌿 Student Recovery Oasis</span>
+            <h2 class="metime-title">Your "Me Time" Special Sanctuary</h2>
+            <p class="metime-subtitle">De-stress from academic pressure, recharge your mental battery, and restore emotional equilibrium.</p>
+          </div>
+          
+          <!-- Live Mood Selector -->
+          <div class="metime-mood-box">
+            <span class="mood-box-label">How are you feeling right now?</span>
+            <div class="mood-emojis-row" id="mood-selector-row">
+              <button class="mood-btn" data-mood="inspired" title="Feeling Inspired & Energetic">🤩 <span>Inspired</span></button>
+              <button class="mood-btn active" data-mood="calm" title="Feeling Calm & Centered">😌 <span>Peaceful</span></button>
+              <button class="mood-btn" data-mood="overwhelmed" title="Feeling Overwhelmed by Studies">😰 <span>Stressed</span></button>
+              <button class="mood-btn" data-mood="tired" title="Feeling Fatigued / Need Rest">😴 <span>Tired</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="metime-grid-layout">
+          
+          <!-- Left Column: Interactive Box Breathing Orb -->
+          <div class="card glass-card breathing-card">
+            <div class="card-header-compact">
+              <h3 class="section-title-sm">🌬️ Guided Mindful Breathwork</h3>
+              <div class="breath-mode-selector">
+                <button class="breath-mode-btn active" data-mode="box">Box (4-4-4-4)</button>
+                <button class="breath-mode-btn" data-mode="relax">4-7-8 Relax</button>
+              </div>
+            </div>
+            
+            <p class="breathing-desc" id="breath-technique-desc">Used by high performers to instantly lower cortisol, steady the heart rate, and clear mental fog.</p>
+
+            <div class="breathing-visual-container">
+              <div class="breathing-orb-wrapper">
+                <div class="breathing-pulse-ring"></div>
+                <div class="breathing-orb" id="breathing-orb">
+                  <div class="orb-inner-text">
+                    <span id="breath-instruction-text" class="breath-instruction">Ready</span>
+                    <span id="breath-countdown-timer" class="breath-timer">4</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="breathing-controls">
+              <button id="btn-start-breathing" class="btn-primary" style="min-width:140px;">Begin Breathwork</button>
+              <button id="btn-reset-breathing" class="btn-secondary">Reset</button>
+            </div>
+          </div>
+
+          <!-- Right Column: The Worry Dissolver / Stress Burner -->
+          <div class="card glass-card worry-burner-card">
+            <div class="card-header-compact">
+              <h3 class="section-title-sm">🔥 Academic Stress Dissolver</h3>
+              <span class="card-chip" style="background:rgba(239, 68, 68, 0.15); color:var(--danger);">Psychological Release</span>
+            </div>
+            
+            <p class="worry-burner-desc">Type whatever study fear, exam anxiety, or self-doubt is bothering you. Watch it burn away into particles and release its hold on your mind.</p>
+            
+            <div class="worry-input-box" id="worry-dissolve-area">
+              <textarea id="worry-text-input" rows="3" placeholder="e.g. 'I am terrified I will run out of time on the physics midterm tomorrow...'"></textarea>
+              <div id="worry-ash-particles" class="ash-particle-container hidden"></div>
+            </div>
+
+            <div class="worry-burner-actions">
+              <button id="btn-burn-worry" class="btn-primary btn-burn-danger">
+                <span>🔥 Burn &amp; Let Go</span>
+              </button>
+              <span class="worry-hint">Safe &amp; private: never stored anywhere.</span>
+            </div>
+
+            <div id="worry-release-affirmation" class="release-affirmation hidden">
+              ✨ <em>"Your thoughts do not define your ability. Take one step at a time; you are well capable of handling this."</em>
+            </div>
+          </div>
+
+          <!-- Bottom Row 1: Calming Mindful Audio Soundscapes -->
+          <div class="card glass-card soundscape-card">
+            <div class="card-header-compact">
+              <h3 class="section-title-sm">🎧 Organic Mindful Soundscapes (Web Audio)</h3>
+              <span class="soundscape-status" id="soundscape-status-text">Audio: Off</span>
+            </div>
+
+            <p class="soundscape-subtitle">Synthesized organic binaural tones and natural sounds designed to induce alpha brainwave relaxation.</p>
+            
+            <div class="soundscape-grid">
+              <button class="soundscape-btn active" data-sound="off">
+                <span class="sound-emoji">🔇</span>
+                <span class="sound-title">Silence</span>
+              </button>
+              <button class="soundscape-btn" data-sound="rain">
+                <span class="sound-emoji">🌧️</span>
+                <span class="sound-title">Gentle Rain</span>
+              </button>
+              <button class="soundscape-btn" data-sound="ocean">
+                <span class="sound-emoji">🌊</span>
+                <span class="sound-title">Ocean Tide</span>
+              </button>
+              <button class="soundscape-btn" data-sound="breeze">
+                <span class="sound-emoji">🍃</span>
+                <span class="sound-title">Soft Breeze</span>
+              </button>
+              <button class="soundscape-btn" data-sound="zen432">
+                <span class="sound-emoji">🧘</span>
+                <span class="sound-title">432Hz Zen Tone</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom Row 2: Self-Care Micro Menu & Gratitude -->
+          <div class="card glass-card self-care-menu-card">
+            <div class="card-header-compact">
+              <h3 class="section-title-sm">✨ Me Time Micro-Care Routine</h3>
+              <button id="btn-reset-care-checklist" class="btn-text-sm">Reset</button>
+            </div>
+
+            <div class="self-care-checklist" id="self-care-checklist-container">
+              <label class="care-item">
+                <input type="checkbox" class="care-checkbox" id="care-1">
+                <span>💧 Drink a full 500ml glass of fresh water</span>
+              </label>
+              <label class="care-item">
+                <input type="checkbox" class="care-checkbox" id="care-2">
+                <span>🌿 2-minute posture &amp; neck shoulder rolls</span>
+              </label>
+              <label class="care-item">
+                <input type="checkbox" class="care-checkbox" id="care-3">
+                <span>☀️ Step near a window or outdoors for sunlight</span>
+              </label>
+              <label class="care-item">
+                <input type="checkbox" class="care-checkbox" id="care-4">
+                <span>🎵 Listen to one song with eyes closed and no screens</span>
+              </label>
+              <label class="care-item">
+                <input type="checkbox" class="care-checkbox" id="care-5">
+                <span>📵 15-minute digital detox away from social feeds</span>
+              </label>
+            </div>
+
+            <div class="gratitude-quick-row">
+              <label for="gratitude-input-text" class="gratitude-label">💖 One thing I am deeply grateful for today:</label>
+              <div style="display:flex; gap:0.5rem;">
+                <input type="text" id="gratitude-input-text" class="form-control" placeholder="e.g. A hot cup of tea, a supportive friend, or finishing my lab report.">
+                <button id="btn-save-gratitude" class="btn-primary" style="white-space:nowrap;">Save</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= PAGE 3: ACADEMIC ANALYTICS & 30-DAY HEATMAP ================= -->
+      <section id="page-analytics" class="page-view hidden" aria-label="Academic Analytics Page">
+        <div class="page-header-bar">
+          <div>
+            <h2 class="page-heading">Academic Analytics &amp; Consistency Heatmap</h2>
+            <p class="page-subheading">Track your 30-day activity matrix, cumulative goals, and category dedication.</p>
+          </div>
+        </div>
+
+        <!-- Metric Stat Cards -->
+        <div class="analytics-stat-row">
+          <div class="card glass-card stat-summary-card">
+            <span class="stat-card-label">Total Goals Completed</span>
+            <span class="stat-card-val color-success" id="analytics-total-completed">0</span>
+            <span class="stat-card-sub">All-time tracked achievements</span>
+          </div>
+          <div class="card glass-card stat-summary-card">
+            <span class="stat-card-label">Current Daily Streak</span>
+            <span class="stat-card-val color-accent" id="analytics-current-streak">0 Days</span>
+            <span class="stat-card-sub">Consecutive active study days</span>
+          </div>
+          <div class="card glass-card stat-summary-card">
+            <span class="stat-card-label">Best Streak Achieved</span>
+            <span class="stat-card-val color-warning" id="analytics-best-streak">0 Days</span>
+            <span class="stat-card-sub">Personal consistency record</span>
+          </div>
+          <div class="card glass-card stat-summary-card">
+            <span class="stat-card-label">Top Category Focus</span>
+            <span class="stat-card-val" id="analytics-top-category">None</span>
+            <span class="stat-card-sub">Highest completed milestone category</span>
+          </div>
+        </div>
+
+        <!-- 30-Day Activity Heatmap Grid -->
+        <div class="card glass-card heatmap-full-card">
+          <div class="card-header-compact">
+            <h3 class="section-title-sm">🗓️ 30-Day Activity Heatmap (GitHub Style)</h3>
+            <div class="heatmap-legend">
+              <span>Less</span>
+              <span class="legend-cell lvl-0"></span>
+              <span class="legend-cell lvl-1"></span>
+              <span class="legend-cell lvl-2"></span>
+              <span class="legend-cell lvl-3"></span>
+              <span>More</span>
+            </div>
+          </div>
+          <div class="heatmap-matrix" id="heatmap-matrix-container">
+            <!-- Dynamically populated 30 days grid -->
+          </div>
+        </div>
+
+        <!-- 7-Day Completion Rate Chart -->
+        <div class="card glass-card" style="margin-top:1.5rem;">
+          <h3 class="section-title-sm" style="margin-bottom:1rem;">📈 Weekly Goal Completion Rate</h3>
+          <div class="weekly-bar-chart" id="weekly-chart-page-container">
+            <!-- Dynamically populated 7 days bars -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= PAGE 4: EXAMS & DEADLINES ================= -->
+      <section id="page-schedule" class="page-view hidden" aria-label="Exams and Deadlines Page">
+        <div class="page-header-bar">
+          <div>
+            <h2 class="page-heading">Exams &amp; Assignment Milestones</h2>
+            <p class="page-subheading">Countdown to your most critical midterms, finals, project submissions, and presentations.</p>
+          </div>
+          <button id="btn-add-deadline-modal" class="btn-primary">+ Add Exam / Deadline</button>
+        </div>
+
+        <div class="deadlines-grid" id="deadlines-list-container">
+          <!-- Dynamically populated deadline countdown cards -->
+        </div>
+
+        <!-- Empty state for deadlines -->
+        <div id="deadlines-empty-state" class="empty-state-card hidden">
+          <div class="empty-icon-wrap">📅</div>
+          <h3 class="empty-title">No Upcoming Exam Milestones</h3>
+          <p class="empty-desc">Stay ahead of the semester curve by tracking your major exam dates and assignment deadlines with live countdowns.</p>
+          <button id="btn-empty-add-deadline" class="btn-primary">+ Add First Milestone</button>
+        </div>
+      </section>
+
+      <!-- ================= PAGE 5: SETTINGS & CLOUD DATABASE ================= -->
+      <section id="page-settings" class="page-view hidden" aria-label="Settings and Database Page">
+        <div class="page-header-bar">
+          <div>
+            <h2 class="page-heading">Settings &amp; Database Configuration</h2>
+            <p class="page-subheading">Manage your cloud database persistence, user accounts, and data export/import.</p>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <!-- Supabase Cloud Connection Box -->
+          <div class="card glass-card">
+            <h3 class="section-title-sm" style="margin-bottom:0.75rem;">🗄️ Supabase Cloud Database</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+              Connect your Supabase project for persistent cloud storage and synchronization across all your devices.
+            </p>
+            
+            <form id="settings-db-form" class="db-form">
+              <div class="form-group">
+                <label for="settings-supabase-url" class="form-label">Supabase Project URL</label>
+                <input type="url" id="settings-supabase-url" class="form-control" placeholder="https://your-project.supabase.co">
+              </div>
+
+              <div class="form-group">
+                <label for="settings-supabase-key" class="form-label">Supabase Public Anon Key</label>
+                <input type="password" id="settings-supabase-key" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+              </div>
+
+              <div id="settings-db-feedback" class="conn-feedback hidden"></div>
+
+              <div style="display:flex; gap:0.75rem; margin-top:0.5rem; flex-wrap:wrap;">
+                <button type="submit" class="btn-primary">Save &amp; Test Connection</button>
+                <button type="button" id="btn-settings-disconnect-db" class="btn-secondary text-danger">Reset to Local DB</button>
+                <button type="button" id="btn-settings-copy-sql" class="btn-ghost-sm">📋 Copy schema.sql</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Data Management Box -->
+          <div class="card glass-card">
+            <h3 class="section-title-sm" style="margin-bottom:0.75rem;">💾 Data Backup &amp; Samples</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+              Export full backups of your goals, reflections, and milestones or load realistic student study plans.
+            </p>
+            
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+              <button id="btn-settings-export" class="btn-secondary">📥 Export All Data (JSON Backup)</button>
+              <button id="btn-settings-import" class="btn-secondary">📤 Import Backup from JSON</button>
+              <button id="btn-settings-load-sample" class="btn-secondary">💡 Load Realistic Student Sample Goals</button>
+              <button id="btn-settings-clear-data" class="btn-secondary text-danger">🗑️ Clear Current Day Goals</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <p>StudyPulse • Student Goal Tracker &amp; Wellness Oasis • Real persistence &amp; mindful study habits.</p>
+        <div class="footer-links">
+          <span>Shortcuts: <kbd>N</kbd> New Goal • <kbd>P</kbd> Pomodoro • <kbd>Esc</kbd> Close</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ================= MODALS & DRAWERS ================= -->
+
+  <!-- 1. Add / Edit Goal Modal -->
+  <div id="goal-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-window glass-modal">
+      <div class="modal-header">
+        <div class="modal-header-icon" id="modal-icon-badge">🎯</div>
+        <div class="modal-header-info">
+          <h2 id="modal-title" class="modal-title-text">Add Daily Goal</h2>
+          <p class="modal-subtitle">Set clear, categorized milestones for today.</p>
+        </div>
+        <button id="btn-close-modal" class="modal-close-btn" aria-label="Close Modal">✕</button>
+      </div>
+
+      <form id="goal-form" class="goal-form">
+        <input type="hidden" id="form-goal-id">
+
+        <div class="form-group">
+          <label for="goal-title-input" class="form-label">Goal Title <span class="required">*</span></label>
+          <input type="text" id="goal-title-input" class="form-control" placeholder="e.g. Complete Discrete Math Chapter 4 &amp; Quiz" required maxlength="120">
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="goal-category-select" class="form-label">Category <span class="required">*</span></label>
+            <select id="goal-category-select" class="form-control" required></select>
+          </div>
+
+          <div class="form-group">
+            <label for="goal-priority-select" class="form-label">Priority</label>
+            <select id="goal-priority-select" class="form-control">
+              <option value="high">🔴 High Priority (Crucial)</option>
+              <option value="medium" selected>🟡 Medium Priority (Important)</option>
+              <option value="low">🟢 Low Priority (Optional)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="goal-time-input" class="form-label">Target Time / Deadline</label>
+            <input type="time" id="goal-time-input" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label for="goal-duration-input" class="form-label">Estimated Duration (Mins)</label>
+            <input type="number" id="goal-duration-input" class="form-control" placeholder="e.g. 45" min="5" max="480" step="5" value="30">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="checklist-header">
+            <label class="form-label">Subtasks / Checklist (Optional)</label>
+            <span class="checklist-hint">Break big goals into bite-sized steps</span>
+          </div>
+          <div id="subtasks-builder-list" class="subtasks-builder-list"></div>
+          <button type="button" id="btn-add-subtask-row" class="btn-ghost-sm btn-add-subtask">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Checklist Step
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label for="goal-notes-input" class="form-label">Notes &amp; Resources (Optional)</label>
+          <textarea id="goal-notes-input" class="form-control form-textarea" rows="2" placeholder="e.g. Reference Lecture slides 12-25, submit on portal by 6 PM"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-modal" class="btn-secondary">Cancel</button>
+          <button type="submit" id="btn-submit-goal" class="btn-primary">Save Goal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Add Exam / Deadline Modal -->
+  <div id="deadline-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="dl-modal-title">
+    <div class="modal-window glass-modal">
+      <div class="modal-header">
+        <div class="modal-header-icon">📅</div>
+        <div class="modal-header-info">
+          <h2 id="dl-modal-title" class="modal-title-text">Add Exam or Project Deadline</h2>
+          <p class="modal-subtitle">Track important countdowns to stay calm and prepared.</p>
+        </div>
+        <button id="btn-close-dl-modal" class="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <form id="deadline-form" class="goal-form">
+        <div class="form-group">
+          <label for="dl-title-input" class="form-label">Milestone Title <span class="required">*</span></label>
+          <input type="text" id="dl-title-input" class="form-control" placeholder="e.g. Operating Systems Midterm Exam" required maxlength="100">
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="dl-subject-input" class="form-label">Subject / Course <span class="required">*</span></label>
+            <input type="text" id="dl-subject-input" class="form-control" placeholder="e.g. CS 301" required maxlength="40">
+          </div>
+          <div class="form-group">
+            <label for="dl-type-select" class="form-label">Milestone Type</label>
+            <select id="dl-type-select" class="form-control">
+              <option value="exam">📝 Major Exam / Final</option>
+              <option value="project">💻 Project Submission</option>
+              <option value="quiz">⚡ Quiz / Assessment</option>
+              <option value="assignment">📑 Assignment Due</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="dl-date-input" class="form-label">Target Date <span class="required">*</span></label>
+            <input type="date" id="dl-date-input" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="dl-time-input" class="form-label">Target Time</label>
+            <input type="time" id="dl-time-input" class="form-control" value="09:00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="dl-notes-input" class="form-label">Preparation Notes (Optional)</label>
+          <textarea id="dl-notes-input" class="form-control form-textarea" rows="2" placeholder="e.g. Covers Chapters 1 to 5. Bring scientific calculator."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-dl-modal" class="btn-secondary">Cancel</button>
+          <button type="submit" class="btn-primary">Add Milestone</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Supabase Database Configuration Modal -->
+  <div id="db-config-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="db-modal-title">
+    <div class="modal-window glass-modal db-modal-window">
+      <div class="modal-header">
+        <div class="modal-header-icon">🗄️</div>
+        <div class="modal-header-info">
+          <h2 id="db-modal-title" class="modal-title-text">Database Setup (Supabase)</h2>
+          <p class="modal-subtitle">Connect your Supabase project for persistent cloud storage and authentication.</p>
+        </div>
+        <button id="btn-close-db-modal" class="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <div class="db-modal-body">
+        <div class="db-status-banner" id="db-modal-status-banner">
+          <div class="db-status-icon-wrap">⚡</div>
+          <div class="db-status-info">
+            <h4 id="db-conn-title">Local Database Mode</h4>
+            <p id="db-conn-desc">Data is currently persisted in your browser local storage.</p>
+          </div>
+        </div>
+
+        <div class="setup-instructions-card">
+          <h4 class="setup-title">Quick Supabase Setup:</h4>
+          <ol class="setup-steps-list">
+            <li>Create a free account or project at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer">supabase.com</a>.</li>
+            <li>Run the database script in <strong>SQL Editor</strong>.</li>
+            <li>Paste your <strong>Project URL</strong> and <strong>Public Anon Key</strong> below.</li>
+          </ol>
+          <div class="sql-copy-row">
+            <span>Database Tables &amp; RLS Policies:</span>
+            <button type="button" id="btn-copy-schema-sql" class="btn-ghost-sm">📋 Copy schema.sql Script</button>
+          </div>
+        </div>
+
+        <form id="db-credentials-form" class="db-form">
+          <div class="form-group">
+            <label for="input-supabase-url" class="form-label">Supabase Project URL <span class="required">*</span></label>
+            <input type="url" id="input-supabase-url" class="form-control" placeholder="https://your-project.supabase.co" required>
+          </div>
+
+          <div class="form-group">
+            <label for="input-supabase-key" class="form-label">Supabase Public Anon Key <span class="required">*</span></label>
+            <input type="password" id="input-supabase-key" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+          </div>
+
+          <div id="db-conn-feedback" class="conn-feedback hidden"></div>
+
+          <div class="modal-footer" style="padding-top: 1rem;">
+            <button type="button" id="btn-clear-db-credentials" class="btn-secondary text-danger">Reset to Local DB</button>
+            <button type="submit" id="btn-test-save-db" class="btn-primary">Test &amp; Connect Supabase</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Authentication Modal -->
+  <div id="auth-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <div class="modal-window glass-modal auth-modal-window">
+      <div class="modal-header">
+        <div class="modal-header-icon">🔐</div>
+        <div class="modal-header-info">
+          <h2 id="auth-modal-title" class="modal-title-text">Student Authentication</h2>
+          <p class="modal-subtitle">Sign in to securely sync your goals across devices.</p>
+        </div>
+        <button id="btn-close-auth-modal" class="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <div class="auth-modal-body">
+        <div class="auth-tabs" role="tablist">
+          <button id="tab-sign-in" class="auth-tab active" role="tab" aria-selected="true">Sign In</button>
+          <button id="tab-sign-up" class="auth-tab" role="tab" aria-selected="false">Create Account</button>
+        </div>
+
+        <form id="auth-form" class="auth-form">
+          <div class="form-group hidden" id="group-auth-name">
+            <label for="input-auth-name" class="form-label">Full Name</label>
+            <input type="text" id="input-auth-name" class="form-control" placeholder="e.g. Alex Johnson">
+          </div>
+
+          <div class="form-group">
+            <label for="input-auth-email" class="form-label">Student Email <span class="required">*</span></label>
+            <input type="email" id="input-auth-email" class="form-control" placeholder="student@university.edu" required>
+          </div>
+
+          <div class="form-group">
+            <label for="input-auth-password" class="form-label">Password <span class="required">*</span></label>
+            <input type="password" id="input-auth-password" class="form-control" placeholder="••••••••" required minlength="6">
+          </div>
+
+          <div id="auth-feedback" class="conn-feedback hidden"></div>
+
+          <div class="auth-actions">
+            <button type="submit" id="btn-auth-submit" class="btn-primary btn-block">Sign In</button>
+            <button type="button" id="btn-continue-guest" class="btn-secondary btn-block" style="margin-top: 0.5rem;">Continue in Guest / Local Mode</button>
+          </div>
+        </form>
+
+        <div class="auth-privacy-notice">
+          <span>🔒 <strong>Data Privacy:</strong> Row Level Security (RLS) ensures your student goals and reflections are strictly private to you.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Pomodoro Focus Drawer / Modal -->
+  <div id="pomodoro-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pomodoro-title">
+    <div class="modal-window glass-modal pomodoro-modal-content">
+      <div class="modal-header">
+        <div class="modal-header-icon">⏱️</div>
+        <div class="modal-header-info">
+          <h2 id="pomodoro-title" class="modal-title-text">Study Focus Timer</h2>
+          <p id="pomodoro-goal-context" class="modal-subtitle">Stay deeply focused without distractions</p>
+        </div>
+        <button id="btn-close-pomodoro" class="modal-close-btn" aria-label="Close Timer">✕</button>
+      </div>
+
+      <div class="pomodoro-body">
+        <div class="pomo-tabs" role="tablist">
+          <button class="pomo-tab active" data-time="25" data-mode="focus">Focus (25m)</button>
+          <button class="pomo-tab" data-time="5" data-mode="shortBreak">Short Break (5m)</button>
+          <button class="pomo-tab" data-time="15" data-mode="longBreak">Long Break (15m)</button>
+        </div>
+
+        <div class="pomo-timer-display">
+          <div class="timer-time" id="pomo-clock">25:00</div>
+          <div class="timer-status-text" id="pomo-status-label">Ready to Focus</div>
+        </div>
+
+        <div class="pomo-controls">
+          <button id="btn-pomo-start" class="btn-primary pomo-btn-main">Start Focus</button>
+          <button id="btn-pomo-reset" class="btn-secondary">Reset</button>
+        </div>
+
+        <div class="ambient-sound-control">
+          <div class="ambient-label">
+            <span>🎧 Focus White Noise (Synthesizer)</span>
+          </div>
+          <div class="sound-pills">
+            <button class="sound-pill active" data-noise="off">Off</button>
+            <button class="sound-pill" data-noise="brown">Deep Rain</button>
+            <button class="sound-pill" data-noise="pink">Soft Breeze</button>
+            <button class="sound-pill" data-noise="binaural">Binaural 40Hz</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Category Manager Modal -->
+  <div id="category-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="cat-modal-title">
+    <div class="modal-window glass-modal">
+      <div class="modal-header">
+        <div class="modal-header-icon">🏷️</div>
+        <div class="modal-header-info">
+          <h2 id="cat-modal-title" class="modal-title-text">Manage Categories</h2>
+          <p class="modal-subtitle">Customize student goal categories with icons &amp; colors.</p>
+        </div>
+        <button id="btn-close-cat-modal" class="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <div class="category-manager-body">
+        <div class="categories-list-manage" id="categories-manage-list"></div>
+
+        <form id="add-category-form" class="add-cat-form">
+          <h4 class="form-subheading">Create New Category</h4>
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="new-cat-emoji" class="form-label">Icon / Emoji</label>
+              <input type="text" id="new-cat-emoji" class="form-control" value="🚀" maxlength="2" required>
+            </div>
+            <div class="form-group flex-2">
+              <label for="new-cat-name" class="form-label">Category Name</label>
+              <input type="text" id="new-cat-name" class="form-control" placeholder="e.g. Lab Practicals" required maxlength="30">
+            </div>
+            <div class="form-group">
+              <label for="new-cat-color" class="form-label">Theme Color</label>
+              <input type="color" id="new-cat-color" class="form-control color-picker-input" value="#8B5CF6">
+            </div>
+          </div>
+          <button type="submit" class="btn-primary btn-block">+ Add Category</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

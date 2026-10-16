@@ -1,0 +1,7 @@
+Build a fully functional website, not just a UI mockup.
+Make every page, button, form, filter, and navigation link work.
+Persist data in the database.
+Ensure task completion, editing, and deletion work correctly.
+Do not use fake statistics or nonfunctional buttons.
+Test authentication, database operations, responsiveness, and data privacy.
+If Supabase credentials are missing, provide clear setup instructions instead of pretending the backend works.
